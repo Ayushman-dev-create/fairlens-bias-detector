@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FairLens — AI Bias Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #2a2a3a;
+    --accent: #7cffd4;
+    --accent2: #ff6b6b;
+    --accent3: #ffd166;
+    --text: #e8e8f0;
+    --muted: #6b6b88;
+    --glow: rgba(124,255,212,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,255,212,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,255,212,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 8s ease-in-out infinite alternate;
+  }
+  .orb1 { width: 400px; height: 400px; background: rgba(124,255,212,0.06); top: -100px; right: -100px; }
+  .orb2 { width: 300px; height: 300px; background: rgba(255,107,107,0.05); bottom: -50px; left: -50px; animation-delay: -4s; }
+
+  @keyframes drift {
+    from { transform: translate(0,0); }
+    to { transform: translate(30px, 20px); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .badge {
+    display: inline-block;
+    background: rgba(124,255,212,0.1);
+    border: 1px solid rgba(124,255,212,0.3);
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 7vw, 64px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  h1 span.hl { color: var(--accent); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  /* Main card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.2s; }
+
+  .card-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* Category chips */
+  .categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .chip {
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    transition: all 0.2s;
+    font-family: 'DM Mono', monospace;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { background: rgba(124,255,212,0.1); border-color: var(--accent); color: var(--accent); }
+
+  /* Textarea */
+  .input-area {
+    position: relative;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 16px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: rgba(124,255,212,0.4); }
+  textarea::placeholder { color: var(--muted); }
+
+  .char-count {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Example buttons */
+  .examples {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .example-btn {
+    cursor: pointer;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    transition: all 0.2s;
+  }
+  .example-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  /* Analyze button */
+  .analyze-btn {
+    width: 100%;
+    padding: 16px;
+    margin-top: 20px;
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .analyze-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(124,255,212,0.25); }
+  .analyze-btn:active { transform: translateY(0); }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .analyze-btn .btn-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Spinner */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #0a0a0f;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Results */
+  #results {
+    display: none;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+    padding: 20px;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .score-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .score-circle svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .score-circle .score-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    position: relative;
+    z-index: 1;
+  }
+
+  .score-info h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .score-info p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Sections */
+  .result-section {
+    margin-bottom: 16px;
+    padding: 18px;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .result-section h4 {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .result-section p, .result-section li {
+    font-size: 13px;
+    line-height: 1.8;
+    color: #b0b0c8;
+  }
+
+  .result-section ul {
+    list-style: none;
+    padding: 0;
+  }
+  .result-section ul li::before {
+    content: '→ ';
+    color: var(--accent);
+  }
+
+  .bias-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    margin: 3px;
+    background: rgba(255,107,107,0.1);
+    border: 1px solid rgba(255,107,107,0.3);
+    color: var(--accent2);
+  }
+  .bias-tag.neutral {
+    background: rgba(124,255,212,0.08);
+    border-color: rgba(124,255,212,0.2);
+    color: var(--accent);
+  }
+  .bias-tag.warn {
+    background: rgba(255,209,102,0.08);
+    border-color: rgba(255,209,102,0.3);
+    color: var(--accent3);
+  }
+
+  /* Error box */
+  .error-box {
+    display: none;
+    background: rgba(255,107,107,0.08);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 10px;
+    padding: 16px;
+    color: var(--accent2);
+    font-size: 13px;
+    margin-top: 16px;
+    text-align: center;
+  }
+
+  /* API key notice */
+  .api-notice {
+    background: rgba(255,209,102,0.07);
+    border: 1px solid rgba(255,209,102,0.2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 12px;
+    color: var(--accent3);
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+  .api-notice strong { font-weight: 600; }
+  .api-notice input {
+    width: 100%;
+    margin-top: 10px;
+    background: var(--surface);
+    border: 1px solid rgba(255,209,102,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    outline: none;
+  }
+  .api-notice input:focus { border-color: var(--accent3); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 48px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="container">
+
+  <header>
+    <div class="badge">Google Solution Challenge 2026</div>
+    <h1>Fair<span class="hl">Lens</span></h1>
+    <p class="subtitle">Paste any AI-generated decision — hiring, loans, recommendations — and instantly detect hidden bias with Gemini AI.</p>
+  </header>
+
+  <!-- API Key -->
+  <div class="api-notice">
+    <strong>🔑 Gemini API Key Required</strong> — Get yours free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--accent3)">aistudio.google.com</a>
+    <input type="password" id="apiKey" placeholder="Paste your Gemini API key here..." />
+  </div>
+
+  <!-- Input Card -->
+  <div class="card">
+    <div class="card-label">01 — Select Decision Type</div>
+    <div class="categories">
+      <div class="chip active" data-cat="hiring">Hiring / Recruitment</div>
+      <div class="chip" data-cat="loan">Loan / Credit</div>
+      <div class="chip" data-cat="medical">Medical Diagnosis</div>
+      <div class="chip" data-cat="education">Education / Admission</div>
+      <div class="chip" data-cat="other">Other</div>
+    </div>
+
+    <div class="card-label">02 — Paste AI Decision Text</div>
+    <div class="input-area">
+      <textarea id="decisionText" placeholder="Paste the AI-generated decision, recommendation, or output here..."></textarea>
+      <div class="char-count" id="charCount">0 chars</div>
+    </div>
+
+    <div class="examples">
+      <span style="font-size:11px;color:var(--muted);padding-top:4px;">Try example:</span>
+      <button class="example-btn" data-ex="hiring">Hiring rejection</button>
+      <button class="example-btn" data-ex="loan">Loan denial</button>
+      <button class="example-btn" data-ex="medical">Medical triage</button>
+    </div>
+
+    <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
+      <div class="btn-inner">
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">Analyze for Bias →</span>
+      </div>
+    </button>
+
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="card">
+      <div class="card-label">03 — Analysis Results</div>
+
+      <div class="score-row" id="scoreRow">
+        <div class="score-circle" id="scoreCircle">
+          <svg viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#2a2a3a" stroke-width="6"/>
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#7cffd4" stroke-width="6"
+              stroke-dasharray="213.6" stroke-dashoffset="213.6"
+              stroke-linecap="round" id="scoreArc"/>
+          </svg>
+          <span class="score-num" id="scoreNum">–</span>
+        </div>
+        <div class="score-info">
+          <h3 id="scoreLabel">–</h3>
+          <p id="scoreDesc">–</p>
+        </div>
+      </div>
+
+      <div class="result-section" id="biasTypesSection">
+        <h4>⚡ Detected Bias Types</h4>
+        <div id="biasTagsContainer"></div>
+      </div>
+
+      <div class="result-section">
+        <h4>🔍 Key Observations</h4>
+        <p id="observationsText"></p>
+      </div>
+
+      <div class="result-section">
+        <h4>✅ Recommendations</h4>
+        <ul id="recommendationsList"></ul>
+      </div>
+
+      <div class="result-section">
+        <h4>📊 Affected Groups</h4>
+        <p id="affectedGroups"></p>
+      </div>
+    </div>
+  </div>
+
+  <footer>FAIRLENS · GDSC SOLUTION CHALLENGE 2026 · BUILT WITH GEMINI AI</footer>
+
+</div>
+
+<script>
+const EXAMPLES = {
+  hiring: `Candidate rejected. Profile analysis: The applicant graduated from a tier-3 institution with a GPA of 3.2. Based on historical hiring patterns, candidates from similar backgrounds have shown 40% lower performance. Additionally, the candidate's name suggests a non-native English background which may pose communication challenges. We recommend prioritizing candidates from top-10 universities.`,
+  loan: `Loan application denied. The applicant resides in ZIP code 90011, which falls in a high-risk demographic zone. Historical default rates in this neighborhood are 3x the national average. Despite the applicant's steady 5-year employment record and income of $65,000/year, the location risk score of 8.4 makes this application ineligible under our current model.`,
+  medical: `Patient triaged to low priority. Female patient, age 45, presenting with chest pain. Based on demographic profile and historical data, psychosomatic causes are more likely in this demographic. Recommend follow-up with general practitioner rather than immediate cardiac evaluation.`
+};
+
+let selectedCategory = 'hiring';
+
+// Category chips
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedCategory = chip.dataset.cat;
+  });
+});
+
+// Example buttons
+document.querySelectorAll('.example-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const ta = document.getElementById('decisionText');
+    ta.value = EXAMPLES[btn.dataset.ex];
+    updateCount();
+    // Auto-select matching category
+    const chip = document.querySelector(`.chip[data-cat="${btn.dataset.ex}"]`);
+    if (chip) {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selectedCategory = btn.dataset.ex;
+    }
+  });
+});
+
+// Char count
+const ta = document.getElementById('decisionText');
+function updateCount() {
+  document.getElementById('charCount').textContent = ta.value.length + ' chars';
+}
+ta.addEventListener('input', updateCount);
+
+async function analyze() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const text = document.getElementById('decisionText').value.trim();
+  const errorBox = document.getElementById('errorBox');
+
+  errorBox.style.display = 'none';
+
+  if (!apiKey) { showError('Please enter your Gemini API key above.'); return; }
+  if (!text) { showError('Please paste an AI decision to analyze.'); return; }
+
+  setLoading(true);
+  document.getElementById('results').style.display = 'none';
+
+  const prompt = `You are an AI fairness expert. Analyze the following AI-generated decision for bias and fairness issues.
+
+Decision Type: ${selectedCategory}
+Decision Text: """${text}"""
+
+Respond ONLY with valid JSON (no markdown, no extra text) in this exact format:
+{
+  "fairnessScore": <number 0-100, where 100 is fully fair>,
+  "overallVerdict": "<one of: Highly Biased | Moderately Biased | Slightly Biased | Mostly Fair | Fully Fair>",
+  "verdictExplanation": "<one sentence summary>",
+  "biasTypes": ["<bias type 1>", "<bias type 2>"],
+  "observations": "<2-3 sentences about what specific language or patterns indicate bias>",
+  "recommendations": ["<recommendation 1>", "<recommendation 2>", "<recommendation 3>"],
+  "affectedGroups": "<sentence about which demographic groups are potentially disadvantaged>"
+}`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: "You are an AI fairness and bias detection expert. Always respond with valid JSON only.",
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content.map(i => i.text || "").join("");
+    const clean = raw.replace(/```json|```/g, "").trim();
+    const result = JSON.parse(clean);
+    renderResults(result);
+  } catch (err) {
+    showError('Analysis failed. Check your API key or try again. (' + err.message + ')');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderResults(r) {
+  const score = r.fairnessScore;
+
+  // Score arc
+  const circumference = 213.6;
+  const offset = circumference - (score / 100) * circumference;
+  const arc = document.getElementById('scoreArc');
+  arc.style.strokeDashoffset = offset;
+  arc.style.stroke = score >= 70 ? '#7cffd4' : score >= 40 ? '#ffd166' : '#ff6b6b';
+
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreNum').style.color = score >= 70 ? '#7cffd4' : score >= 40 ? '#ffd166' : '#ff6b6b';
+  document.getElementById('scoreLabel').textContent = r.overallVerdict;
+  document.getElementById('scoreDesc').textContent = r.verdictExplanation;
+
+  // Bias tags
+  const container = document.getElementById('biasTagsContainer');
+  container.innerHTML = '';
+  (r.biasTypes || []).forEach(bt => {
+    const tag = document.createElement('span');
+    tag.className = 'bias-tag' + (score >= 70 ? ' neutral' : score >= 40 ? ' warn' : '');
+    tag.textContent = bt;
+    container.appendChild(tag);
+  });
+
+  document.getElementById('observationsText').textContent = r.observations;
+
+  const ul = document.getElementById('recommendationsList');
+  ul.innerHTML = '';
+  (r.recommendations || []).forEach(rec => {
+    const li = document.createElement('li');
+    li.textContent = rec;
+    ul.appendChild(li);
+  });
+
+  document.getElementById('affectedGroups').textContent = r.affectedGroups;
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setLoading(on) {
+  document.getElementById('analyzeBtn').disabled = on;
+  document.getElementById('spinner').style.display = on ? 'block' : 'none';
+  document.getElementById('btnText').textContent = on ? 'Analyzing...' : 'Analyze for Bias →';
+}
+
+function showError(msg) {
+  const eb = document.getElementById('errorBox');
+  eb.textContent = '⚠ ' + msg;
+  eb.style.display = 'block';
+  setLoading(false);
+}
+</script>
+</body>
+</html>
